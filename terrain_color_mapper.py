@@ -119,16 +119,16 @@ class TerrainColorMapper:
     def __init__(self, filaments, lookup):
         self.filaments = filaments
         self.lookup = lookup
-        self.lookup_lab = self.build_lookup_lab(self.lookup, self.filaments)
+        self.lookup_lab = self._build_lookup_lab(self.lookup, self.filaments)
         self.matrices = None
         self.meta = None
 
-    def rgb_to_lab(self, rgb_tuple):
+    def _rgb_to_lab(self, rgb_tuple):
         """Convert a single (R,G,B) 0-255 tuple to CIELAB."""
         arr = np.array(rgb_tuple, dtype=np.float32).reshape(1, 1, 3) / 255.0
         return skcolor.rgb2lab(arr).reshape(3)
 
-    def build_lookup_lab(self, lookup, filaments):
+    def _build_lookup_lab(self, lookup, filaments):
         """
         Pre-convert every lookup entry's result_rgb to LAB.
         Also add one 'solid' entry per filament (top_layers=5, no bottom)
@@ -146,7 +146,7 @@ class TerrainColorMapper:
                 "bottom":     None,
                 "top_layers": 5,
                 "result_rgb": fdata["rgb"],
-                "result_lab": self.rgb_to_lab(fdata["rgb"]),
+                "result_lab": self._rgb_to_lab(fdata["rgb"]),
             })
 
         # Combination entries from lookup table
@@ -156,7 +156,7 @@ class TerrainColorMapper:
                 "bottom":     row["bottom"],
                 "top_layers": row["top_layers"],
                 "result_rgb": row["result_rgb"],
-                "result_lab": self.rgb_to_lab(row["result_rgb"]),
+                "result_lab": self._rgb_to_lab(row["result_rgb"]),
             })
 
         return entries
