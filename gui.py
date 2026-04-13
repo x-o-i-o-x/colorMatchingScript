@@ -10,6 +10,14 @@ import io
 
 
 class TerrainColorMapperGUI:
+    # Image display configuration: defines which images to display
+    IMAGE_DISPLAY_CONFIG = [
+        {"attr_name": "proposed_color_image", "label": "Proposed Color"},
+        {"attr_name": "height_map_image", "label": "Height Map"},
+        {"attr_name": "used_color_image", "label": "Used Color"},
+        {"attr_name": "top_layer_image", "label": "Top Layer"},
+    ]
+
     def __init__(self, title="Terrain Color Mapper", width=1000, height=700):
         """Initialize the GUI."""
         self.title = title
@@ -24,6 +32,9 @@ class TerrainColorMapperGUI:
         self.used_color_image = None
         self.top_layer_image = None
         self.download_buttons = {}  # Store download button references
+        self.preview_image_file = "Color.png"
+        self.preview_texture_tag = "preview_texture"
+        self.texture_registry_tag = "texture_registry"
 
         # Redirect stdout to capture print statements
         self.console_output = io.StringIO()
@@ -32,18 +43,48 @@ class TerrainColorMapperGUI:
 
         # Create context
         dpg.create_context()
+        
+        # Create texture registry once at startup
+        with dpg.texture_registry(tag=self.texture_registry_tag, show=False):
+            pass
+
+        # Load one preview texture for the image panel
+        self.preview_texture_loaded = self._load_preview_texture()
 
         # Create viewport
         dpg.create_viewport(title=self.title, width=self.width, height=self.height)
+
+    def _load_preview_texture(self):
+        """Load the preview image texture used in the image panel."""
+        try:
+            width, height, channels, buffer = dpg.load_image(self.preview_image_file)
+            dpg.add_raw_texture(
+                width,
+                height,
+                buffer,
+                tag=self.preview_texture_tag,
+                parent=self.texture_registry_tag,
+                format=dpg.mvFormat_Float_rgba,
+            )
+            return True
+        except Exception as e:
+            print(f"Preview texture load failed: {e}")
+            return False
 
     # ------------------------------------------------------------------
     # Panel content builders
     # ------------------------------------------------------------------
 
     def _setup_image_panel(self):
-        """Set up the image display panel (placeholder)."""
-        dpg.add_text("Image Panel - Placeholder")
-        dpg.add_text("Images will be displayed here with subtitles.")
+        """Set up the image display panel with one image."""
+        if self.preview_texture_loaded:
+            dpg.add_image(self.preview_texture_tag, tag="preview_image")
+        else:
+            dpg.add_text("Preview image not available.")
+    
+    def _create_image_display_slot(self, attr_name, label):
+        # Disabled while simplifying image display. The panel now shows a single preview image.
+        pass
 
     def _setup_console_panel(self):
         """Set up the console output panel.
@@ -184,6 +225,10 @@ class TerrainColorMapperGUI:
             print(f"Downloading {image_type} image: {file_path}")
         else:
             print(f"Error: No {image_type} image available.")
+
+    def _display_image(self, attr_name):
+        # Disabled while simplifying image display. No dynamic per-slot rendering is used.
+        return
 
     # ------------------------------------------------------------------
     # Layout
