@@ -21,6 +21,9 @@ class TerrainColorMapperGUI:
         self._console_collapsed = False
         self.proposed_color_image = None
         self.height_map_image = None
+        self.used_color_image = None
+        self.top_layer_image = None
+        self.download_buttons = {}  # Store download button references
 
         # Redirect stdout to capture print statements
         self.console_output = io.StringIO()
@@ -58,77 +61,129 @@ class TerrainColorMapperGUI:
             self.console_text_tag = dpg.add_text("", tag="console_text")
 
     def _setup_control_panel(self):
-        """Set up the control panel with image upload buttons."""
+        """Set up the control panel with image upload and download buttons."""
         dpg.add_text("Image Upload")
         dpg.add_separator()
         
-        dpg.add_button(
-            label="Upload Proposed Color Image",
-            width=-1,
-            callback=self._on_upload_proposed_color,
-            tag="btn_proposed_color"
+        self._create_upload_button(
+            "Proposed Color",
+            "proposed_color_image",
+            "proposed_color_status"
         )
-        self.proposed_color_status = dpg.add_text("No file selected", color=(200, 200, 200))
         
         dpg.add_spacing(count=2)
         
-        dpg.add_button(
-            label="Upload Height Map Image",
-            width=-1,
-            callback=self._on_upload_height_map,
-            tag="btn_height_map"
+        self._create_upload_button(
+            "Height Map",
+            "height_map_image",
+            "height_map_status"
         )
-        self.height_map_status = dpg.add_text("No file selected", color=(200, 200, 200))
+        
+        dpg.add_spacing(count=3)
+        dpg.add_text("Image Download")
+        dpg.add_separator()
+        
+        self._create_download_button(
+            "Used Color",
+            "used_color_image"
+        )
+        
+        dpg.add_spacing(count=2)
+        
+        self._create_download_button(
+            "Top Layer",
+            "top_layer_image"
+        )
+        
+        # Initialize buttons as disabled
+        self._update_download_buttons()
 
-    def _on_upload_proposed_color(self, sender, app_data, user_data):
-        """Handle proposed color image upload."""
+    def _create_upload_button(self, image_type, attr_name, status_attr_name):
+        """Create an upload button for an image type.
+        
+        Args:
+            image_type: Display name of the image (e.g., "Proposed Color")
+            attr_name: Name of the instance attribute to store the file path
+            status_attr_name: Name of the instance attribute to store the status widget
+        """
+        dpg.add_button(
+            label=f"Upload {image_type} Image",
+            width=-1,
+            callback=self._on_upload_file,
+            user_data={"attr_name": attr_name, "image_type": image_type}
+        )
+        status_widget = dpg.add_text("No file selected", color=(200, 200, 200))
+        setattr(self, status_attr_name, status_widget)
+
+    def _on_upload_file(self, sender, app_data, user_data):
+        """Generic file upload handler."""
+        image_type = user_data["image_type"]
         with dpg.file_dialog(
             directory_selector=False,
             show=True,
-            callback=self._file_dialog_proposed_callback,
-            tag="file_dialog_proposed",
+            callback=self._file_dialog_callback,
+            user_data=user_data,
             width=700,
             height=400
         ):
             dpg.add_file_extension(".png", custom_text="PNG Images")
             dpg.add_file_extension(".*")
 
-    def _file_dialog_proposed_callback(self, sender, app_data):
-        """Callback for proposed color image file dialog."""
+    def _file_dialog_callback(self, sender, app_data, user_data):
+        """Generic file dialog callback."""
         selected_file = app_data["file_path_name"]
+        attr_name = user_data["attr_name"]
+        image_type = user_data["image_type"]
+        
         if selected_file.lower().endswith('.png'):
-            self.proposed_color_image = selected_file
+            # Store file path in instance attribute
+            setattr(self, attr_name, selected_file)
+            
+            # Update status widget
             filename = selected_file.split("\\")[-1]
-            dpg.set_value(self.proposed_color_status, f"✓ {filename}")
-            dpg.configure_item(self.proposed_color_status, color=(100, 200, 100))
-            print(f"Proposed color image loaded: {selected_file}")
+            status_attr_name = f"{attr_name.replace('_image', '')}_status"
+            status_widget = getattr(self, status_attr_name)
+            dpg.set_value(status_widget, f"✓ {filename}")
+            dpg.configure_item(status_widget, color=(100, 200, 100))
+            
+            print(f"{image_type} image loaded: {selected_file}")
+            
+            # Update download buttons state
+            self._update_download_buttons()
         else:
             print(f"Error: Invalid file type. Only .png files are accepted.")
 
-    def _on_upload_height_map(self, sender, app_data, user_data):
-        """Handle height map image upload."""
-        with dpg.file_dialog(
-            directory_selector=False,
-            show=True,
-            callback=self._file_dialog_height_callback,
-            tag="file_dialog_height",
-            width=700,
-            height=400
-        ):
-            dpg.add_file_extension(".png", custom_text="PNG Images")
-            dpg.add_file_extension(".*")
+    def _create_download_button(self, image_type, attr_name):
+        """Create a download button for an image type.
+        
+        Args:
+            image_type: Display name of the image (e.g., "Used Color")
+            attr_name: Name of the instance attribute storing the file path
+        """
+        btn = dpg.add_button(
+            label=f"Download {image_type} Image",
+            width=-1,
+            callback=self._on_download_file,
+            user_data={"attr_name": attr_name, "image_type": image_type}
+        )
+        self.download_buttons[attr_name] = btn
 
-    def _file_dialog_height_callback(self, sender, app_data):
-        """Callback for height map image file dialog."""
-        selected_file = app_data["file_path_name"]
-        if selected_file.lower().endswith('.png'):
-            self.height_map_image = selected_file
-            filename = selected_file.split("\\")[-1]
-            dpg.set_value(self.height_map_status, f"✓ {filename}")
-            dpg.configure_item(self.height_map_status, color=(100, 200, 100))
-            print(f"Height map image loaded: {selected_file}")
+    def _update_download_buttons(self):
+        """Enable/disable download buttons based on image availability."""
+        for attr_name, btn in self.download_buttons.items():
+            image_available = getattr(self, attr_name) is not None
+            dpg.configure_item(btn, enabled=image_available)
+
+    def _on_download_file(self, sender, app_data, user_data):
+        """Generic file download handler."""
+        attr_name = user_data["attr_name"]
+        image_type = user_data["image_type"]
+        file_path = getattr(self, attr_name)
+        
+        if file_path:
+            print(f"Downloading {image_type} image: {file_path}")
         else:
-            print(f"Error: Invalid file type. Only .png files are accepted.")
+            print(f"Error: No {image_type} image available.")
 
     # ------------------------------------------------------------------
     # Layout
