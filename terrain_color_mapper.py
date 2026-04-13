@@ -161,14 +161,69 @@ class TerrainColorMapper:
 
         return entries
 
-    def process_image(self, input_path):
+    def _adjust_hsv(self, data: np.ndarray, hue_shift: float = 0.0,
+                    saturation_scale: float = 1.0,
+                    brightness_scale: float = 1.0) -> np.ndarray:
+        """
+        Apply hue, saturation, and brightness adjustments to an RGB image array.
+
+        Parameters
+        ----------
+        data              : np.ndarray, shape (H, W, 3), dtype uint8
+                            Input image in RGB colour space.
+        hue_shift         : float — degrees to rotate the hue wheel. Range [-180, 180].
+                            0.0 = no change.
+        saturation_scale  : float — multiplicative scale applied to the S channel.
+                            1.0 = no change, 0.0 = greyscale, >1.0 = more vivid.
+        brightness_scale  : float — multiplicative scale applied to the V channel.
+                            1.0 = no change, <1.0 = darker, >1.0 = brighter.
+
+        Returns
+        -------
+        np.ndarray — same shape and dtype (uint8) as *data*.
+        """
+        img_float = data.astype(np.float32) / 255.0       # (H, W, 3), range [0, 1]
+        img_hsv   = skcolor.rgb2hsv(img_float)             # (H, W, 3)
+
+        # Hue: shift then wrap into [0, 1)
+        if hue_shift != 0.0:
+            img_hsv[..., 0] = (img_hsv[..., 0] + hue_shift / 360.0) % 1.0
+
+        # Saturation: scale and clip to [0, 1]
+        if saturation_scale != 1.0:
+            img_hsv[..., 1] = np.clip(img_hsv[..., 1] * saturation_scale, 0.0, 1.0)
+
+        # Brightness (Value): scale and clip to [0, 1]
+        if brightness_scale != 1.0:
+            img_hsv[..., 2] = np.clip(img_hsv[..., 2] * brightness_scale, 0.0, 1.0)
+
+        adjusted = skcolor.hsv2rgb(img_hsv)                # (H, W, 3), float [0, 1]
+        return (adjusted * 255.0).round().astype(np.uint8)
+
+    def process_image(self, input_path, hue_shift: float = 0.0,
+                      saturation_scale: float = 1.0,
+                      brightness_scale: float = 1.0):
         """
         Main pipeline.
 
-        Sets self.matrices and self.meta
+        Parameters
+        ----------
+        input_path        : str — path to the input colour PNG.
+        hue_shift         : float — degrees to rotate hue before matching (default 0).
+        saturation_scale  : float — saturation multiplier before matching (default 1).
+        brightness_scale  : float — brightness multiplier before matching (default 1).
+
+        Sets self.matrices and self.meta.
         """
         img  = Image.open(input_path).convert("RGB")
         data = np.array(img, dtype=np.uint8)          # shape (H, W, 3)
+
+        # Apply HSV correction when any parameter differs from its neutral value
+        if hue_shift != 0.0 or saturation_scale != 1.0 or brightness_scale != 1.0:
+            data = self._adjust_hsv(data, hue_shift, saturation_scale, brightness_scale)
+            print(f"HSV adjustment applied — hue_shift={hue_shift}°, "
+                  f"saturation_scale={saturation_scale}, "
+                  f"brightness_scale={brightness_scale}")
         H, W = data.shape[:2]
 
         print(f"Image size: {W} x {H} ({W*H:,} pixels)")
@@ -180,7 +235,6 @@ class TerrainColorMapper:
         img_lab   = skcolor.rgb2lab(img_float)         # (H, W, 3)
 
         # Initialise all matrices to NOT_USED
-        num_filaments = len(self.filaments)
         matrices = {
             fid: np.full((H, W), NOT_USED, dtype=np.uint8)
             for fid in self.filaments

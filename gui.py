@@ -293,6 +293,7 @@ class TerrainColorMapperGUI:
             try:
                 mapper = TerrainColorMapper(FILAMENTS, LOOKUP)
                 mapper.process_image(self.proposed_color_image)
+                mapper.print_report()
                 # Store image data (PIL Image objects) directly without saving
                 self.used_color_image_data = mapper.get_used_color_image()
                 self.top_layer_image_data = mapper.get_top_layer_image()
