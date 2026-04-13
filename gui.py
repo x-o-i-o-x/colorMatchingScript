@@ -62,24 +62,27 @@ class TerrainColorMapperGUI:
                             attr_name = config["attr_name"]
                             label = config["label"]
                             image_path = getattr(self, attr_name)
-                            dpg.add_text(label)
-                            if image_path:
-                                texture_tag = f"{attr_name}_texture"
-                                if dpg.does_item_exist(texture_tag):
-                                    dpg.delete_item(texture_tag)
-                                try:
-                                    width, height, channels, buffer = dpg.load_image(image_path)
-                                    dpg.add_raw_texture(
-                                        width, height, buffer,
-                                        tag=texture_tag,
-                                        parent=self.texture_registry_tag,
-                                        format=dpg.mvFormat_Float_rgba
-                                    )
-                                    dpg.add_image(texture_tag, tag=f"{attr_name}_display")
-                                except Exception as e:
-                                    dpg.add_text(f"Failed to load image: {e}", color=(255, 100, 100), tag=f"{attr_name}_display")
-                            else:
-                                dpg.add_text("No image loaded", color=(150, 150, 150), tag=f"{attr_name}_display")
+                            slot_tag = f"{attr_name}_slot"
+                            with dpg.child_window(tag=slot_tag, border=True, autosize_x=False, autosize_y=False, width=300, height=300):
+                                if image_path:
+                                    texture_tag = f"{attr_name}_texture"
+                                    if dpg.does_item_exist(texture_tag):
+                                        dpg.delete_item(texture_tag)
+                                    try:
+                                        width, height, channels, buffer = dpg.load_image(image_path)
+                                        dpg.add_raw_texture(
+                                            width, height, buffer,
+                                            tag=texture_tag,
+                                            parent=self.texture_registry_tag,
+                                            format=dpg.mvFormat_Float_rgba
+                                        )
+                                        dpg.add_image(texture_tag, tag=f"{attr_name}_display")
+                                        dpg.configure_item(slot_tag, width=max(300, width + 18), height=max(300, height + 40))
+                                    except Exception as e:
+                                        dpg.add_text(f"Failed to load image: {e}", color=(255, 100, 100), tag=f"{attr_name}_display")
+                                else:
+                                    dpg.add_text("No image loaded", color=(150, 150, 150), tag=f"{attr_name}_display")
+                                dpg.add_text(label, tag=f"{attr_name}_label")
 
     def _setup_image_panel(self):
         """Set up the image display panel with all configured images in a grid."""
