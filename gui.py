@@ -19,6 +19,8 @@ class TerrainColorMapperGUI:
         self.height_consolePanel = 500
         self.console_header_height = 35  # DPG default title-bar height
         self._console_collapsed = False
+        self.proposed_color_image = None
+        self.height_map_image = None
 
         # Redirect stdout to capture print statements
         self.console_output = io.StringIO()
@@ -56,9 +58,77 @@ class TerrainColorMapperGUI:
             self.console_text_tag = dpg.add_text("", tag="console_text")
 
     def _setup_control_panel(self):
-        """Set up the control panel (placeholder)."""
-        dpg.add_text("Control Panel - Placeholder")
-        dpg.add_text("Sliders, buttons, and inputs will go here.")
+        """Set up the control panel with image upload buttons."""
+        dpg.add_text("Image Upload")
+        dpg.add_separator()
+        
+        dpg.add_button(
+            label="Upload Proposed Color Image",
+            width=-1,
+            callback=self._on_upload_proposed_color,
+            tag="btn_proposed_color"
+        )
+        self.proposed_color_status = dpg.add_text("No file selected", color=(200, 200, 200))
+        
+        dpg.add_spacing(count=2)
+        
+        dpg.add_button(
+            label="Upload Height Map Image",
+            width=-1,
+            callback=self._on_upload_height_map,
+            tag="btn_height_map"
+        )
+        self.height_map_status = dpg.add_text("No file selected", color=(200, 200, 200))
+
+    def _on_upload_proposed_color(self, sender, app_data, user_data):
+        """Handle proposed color image upload."""
+        with dpg.file_dialog(
+            directory_selector=False,
+            show=True,
+            callback=self._file_dialog_proposed_callback,
+            tag="file_dialog_proposed",
+            width=700,
+            height=400
+        ):
+            dpg.add_file_extension(".png", custom_text="PNG Images")
+            dpg.add_file_extension(".*")
+
+    def _file_dialog_proposed_callback(self, sender, app_data):
+        """Callback for proposed color image file dialog."""
+        selected_file = app_data["file_path_name"]
+        if selected_file.lower().endswith('.png'):
+            self.proposed_color_image = selected_file
+            filename = selected_file.split("\\")[-1]
+            dpg.set_value(self.proposed_color_status, f"✓ {filename}")
+            dpg.configure_item(self.proposed_color_status, color=(100, 200, 100))
+            print(f"Proposed color image loaded: {selected_file}")
+        else:
+            print(f"Error: Invalid file type. Only .png files are accepted.")
+
+    def _on_upload_height_map(self, sender, app_data, user_data):
+        """Handle height map image upload."""
+        with dpg.file_dialog(
+            directory_selector=False,
+            show=True,
+            callback=self._file_dialog_height_callback,
+            tag="file_dialog_height",
+            width=700,
+            height=400
+        ):
+            dpg.add_file_extension(".png", custom_text="PNG Images")
+            dpg.add_file_extension(".*")
+
+    def _file_dialog_height_callback(self, sender, app_data):
+        """Callback for height map image file dialog."""
+        selected_file = app_data["file_path_name"]
+        if selected_file.lower().endswith('.png'):
+            self.height_map_image = selected_file
+            filename = selected_file.split("\\")[-1]
+            dpg.set_value(self.height_map_status, f"✓ {filename}")
+            dpg.configure_item(self.height_map_status, color=(100, 200, 100))
+            print(f"Height map image loaded: {selected_file}")
+        else:
+            print(f"Error: Invalid file type. Only .png files are accepted.")
 
     # ------------------------------------------------------------------
     # Layout
