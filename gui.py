@@ -27,13 +27,12 @@ class TerrainColorMapperGUI:
         self.height_consolePanel = 500
         self.console_header_height = 35  # DPG default title-bar height
         self._console_collapsed = False
-        self.proposed_color_image = None
+        self.proposed_color_image = "Color.png"  # Start with local image
         self.height_map_image = None
         self.used_color_image = None
         self.top_layer_image = None
         self.download_buttons = {}  # Store download button references
-        self.preview_image_file = "Color.png"
-        self.preview_texture_tag = "preview_texture"
+        self.texture_tags = {}  # Store texture tags for each image
         self.texture_registry_tag = "texture_registry"
 
         # Redirect stdout to capture print statements
@@ -48,39 +47,30 @@ class TerrainColorMapperGUI:
         with dpg.texture_registry(tag=self.texture_registry_tag, show=False):
             pass
 
-        # Load one preview texture for the image panel
-        self.preview_texture_loaded = self._load_preview_texture()
-
-        # Create viewport
-        dpg.create_viewport(title=self.title, width=self.width, height=self.height)
-
-    def _load_preview_texture(self):
-        """Load the preview image texture used in the image panel."""
-        try:
-            width, height, channels, buffer = dpg.load_image(self.preview_image_file)
-            dpg.add_raw_texture(
-                width,
-                height,
-                buffer,
-                tag=self.preview_texture_tag,
-                parent=self.texture_registry_tag,
-                format=dpg.mvFormat_Float_rgba,
-            )
-            return True
-        except Exception as e:
-            print(f"Preview texture load failed: {e}")
-            return False
-
     # ------------------------------------------------------------------
     # Panel content builders
     # ------------------------------------------------------------------
 
     def _setup_image_panel(self):
-        """Set up the image display panel with one image."""
-        if self.preview_texture_loaded:
-            dpg.add_image(self.preview_texture_tag, tag="preview_image")
+        """Set up the image display panel with the proposed color image."""
+        image_path = self.proposed_color_image
+        if image_path:
+            texture_tag = "proposed_color_texture"
+            if dpg.does_item_exist(texture_tag):
+                dpg.delete_item(texture_tag)
+            try:
+                width, height, channels, buffer = dpg.load_image(image_path)
+                dpg.add_raw_texture(
+                    width, height, buffer,
+                    tag=texture_tag,
+                    parent=self.texture_registry_tag,
+                    format=dpg.mvFormat_Float_rgba
+                )
+                dpg.add_image(texture_tag, tag="displayed_image")
+            except Exception as e:
+                dpg.add_text(f"Failed to load image: {e}", color=(255, 100, 100), tag="displayed_image")
         else:
-            dpg.add_text("Preview image not available.")
+            dpg.add_text("No image loaded", color=(150, 150, 150), tag="displayed_image")
     
     def _create_image_display_slot(self, attr_name, label):
         # Disabled while simplifying image display. The panel now shows a single preview image.
@@ -191,6 +181,30 @@ class TerrainColorMapperGUI:
             
             # Update download buttons state
             self._update_download_buttons()
+            
+            # Refresh image display if proposed color was uploaded
+            if attr_name == "proposed_color_image":
+                if dpg.does_item_exist("displayed_image"):
+                    dpg.delete_item("displayed_image")
+                if dpg.does_item_exist("proposed_color_texture"):
+                    dpg.delete_item("proposed_color_texture")
+                # Add new image
+                image_path = self.proposed_color_image
+                if image_path:
+                    texture_tag = "proposed_color_texture"
+                    try:
+                        width, height, channels, buffer = dpg.load_image(image_path)
+                        dpg.add_raw_texture(
+                            width, height, buffer,
+                            tag=texture_tag,
+                            parent=self.texture_registry_tag,
+                            format=dpg.mvFormat_Float_rgba
+                        )
+                        dpg.add_image(texture_tag, tag="displayed_image", parent="image_window")
+                    except Exception as e:
+                        dpg.add_text(f"Failed to load image: {e}", color=(255, 100, 100), tag="displayed_image", parent="image_window")
+                else:
+                    dpg.add_text("No image loaded", color=(150, 150, 150), tag="displayed_image", parent="image_window")
         else:
             print(f"Error: Invalid file type. Only .png files are accepted.")
 
@@ -347,6 +361,7 @@ class TerrainColorMapperGUI:
 
     def _show(self):
         """Display the GUI and register the resize callback."""
+        dpg.create_viewport(title=self.title, width=self.width, height=self.height)
         dpg.setup_dearpygui()
         dpg.show_viewport()
         # Viewport resize fires _update_layout event-driven (not per-frame).
