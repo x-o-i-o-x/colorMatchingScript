@@ -249,31 +249,43 @@ class TerrainColorMapperGUI:
     def _update_download_buttons(self):
         """Enable/disable download buttons based on image availability."""
         for attr_name, btn in self.download_buttons.items():
-            image_available = getattr(self, attr_name) is not None
+            # Check if the image data exists (PIL Image object in memory)
+            image_data = getattr(self, f"{attr_name}_data", None)
+            image_available = image_data is not None
             dpg.configure_item(btn, enabled=image_available)
 
     def _on_download_file(self, sender, app_data, user_data):
-        """Generic file download handler."""
+        """Generic file download handler - shows file dialog for saving."""
         attr_name = user_data["attr_name"]
         image_type = user_data["image_type"]
         image_data = getattr(self, f"{attr_name}_data", None)
         
         if image_data is not None:
-            # Save the PIL Image to disk
-            try:
-                from terrain_color_mapper import OUTPUT_USED_COLOR, OUTPUT_TOP_LAYER
-                if attr_name == "used_color_image":
-                    output_path = OUTPUT_USED_COLOR
-                elif attr_name == "top_layer_image":
-                    output_path = OUTPUT_TOP_LAYER
-                else:
-                    output_path = f"{attr_name}.png"
-                image_data.save(output_path)
-                print(f"Downloaded {image_type} image to: {output_path}")
-            except Exception as e:
-                print(f"Error saving {image_type} image: {e}")
+            with dpg.file_dialog(
+                directory_selector=False,
+                show=True,
+                callback=self._file_dialog_save_callback,
+                user_data={"image_data": image_data, "image_type": image_type},
+                width=700,
+                height=400,
+                default_filename=f"{attr_name.replace('_image', '')}.png"
+            ):
+                dpg.add_file_extension(".png", custom_text="PNG Images")
+                dpg.add_file_extension(".*")
         else:
             print(f"Error: No {image_type} image available.")
+
+    def _file_dialog_save_callback(self, sender, app_data, user_data):
+        """Callback for file save dialog."""
+        file_path = app_data["file_path_name"]
+        image_data = user_data["image_data"]
+        image_type = user_data["image_type"]
+        
+        try:
+            image_data.save(file_path)
+            print(f"Downloaded {image_type} image to: {file_path}")
+        except Exception as e:
+            print(f"Error saving {image_type} image: {e}")
 
     def _on_process_images(self, sender, app_data, user_data):
         """Process the proposed color image to generate used color and top layer images."""
