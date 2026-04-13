@@ -27,7 +27,7 @@ class TerrainColorMapperGUI:
         self.height_consolePanel = 500
         self.console_header_height = 35  # DPG default title-bar height
         self._console_collapsed = False
-        self.proposed_color_image = "Color.png"  # Start with local image
+        self.proposed_color_image = None
         self.height_map_image = None
         self.used_color_image = None
         self.top_layer_image = None
@@ -52,25 +52,31 @@ class TerrainColorMapperGUI:
     # ------------------------------------------------------------------
 
     def _setup_image_panel(self):
-        """Set up the image display panel with the proposed color image."""
-        image_path = self.proposed_color_image
-        if image_path:
-            texture_tag = "proposed_color_texture"
-            if dpg.does_item_exist(texture_tag):
-                dpg.delete_item(texture_tag)
-            try:
-                width, height, channels, buffer = dpg.load_image(image_path)
-                dpg.add_raw_texture(
-                    width, height, buffer,
-                    tag=texture_tag,
-                    parent=self.texture_registry_tag,
-                    format=dpg.mvFormat_Float_rgba
-                )
-                dpg.add_image(texture_tag, tag="displayed_image")
-            except Exception as e:
-                dpg.add_text(f"Failed to load image: {e}", color=(255, 100, 100), tag="displayed_image")
-        else:
-            dpg.add_text("No image loaded", color=(150, 150, 150), tag="displayed_image")
+        """Set up the image display panel with all configured images."""
+        with dpg.group(horizontal=False):
+            for config in self.IMAGE_DISPLAY_CONFIG:
+                attr_name = config["attr_name"]
+                label = config["label"]
+                with dpg.child_window(tag=f"{attr_name}_slot", border=True):
+                    dpg.add_text(label)
+                    image_path = getattr(self, attr_name)
+                    if image_path:
+                        texture_tag = f"{attr_name}_texture"
+                        if dpg.does_item_exist(texture_tag):
+                            dpg.delete_item(texture_tag)
+                        try:
+                            width, height, channels, buffer = dpg.load_image(image_path)
+                            dpg.add_raw_texture(
+                                width, height, buffer,
+                                tag=texture_tag,
+                                parent=self.texture_registry_tag,
+                                format=dpg.mvFormat_Float_rgba
+                            )
+                            dpg.add_image(texture_tag, tag=f"{attr_name}_display")
+                        except Exception as e:
+                            dpg.add_text(f"Failed to load image: {e}", color=(255, 100, 100), tag=f"{attr_name}_display")
+                    else:
+                        dpg.add_text("No image loaded", color=(150, 150, 150), tag=f"{attr_name}_display")
     
     def _create_image_display_slot(self, attr_name, label):
         # Disabled while simplifying image display. The panel now shows a single preview image.
@@ -182,16 +188,18 @@ class TerrainColorMapperGUI:
             # Update download buttons state
             self._update_download_buttons()
             
-            # Refresh image display if proposed color was uploaded
-            if attr_name == "proposed_color_image":
-                if dpg.does_item_exist("displayed_image"):
-                    dpg.delete_item("displayed_image")
-                if dpg.does_item_exist("proposed_color_texture"):
-                    dpg.delete_item("proposed_color_texture")
+            # Refresh image display if the uploaded image is one of the display images
+            if attr_name in [config["attr_name"] for config in self.IMAGE_DISPLAY_CONFIG]:
+                display_tag = f"{attr_name}_display"
+                texture_tag = f"{attr_name}_texture"
+                if dpg.does_item_exist(display_tag):
+                    dpg.delete_item(display_tag)
+                if dpg.does_item_exist(texture_tag):
+                    dpg.delete_item(texture_tag)
                 # Add new image
-                image_path = self.proposed_color_image
+                image_path = getattr(self, attr_name)
+                slot_tag = f"{attr_name}_slot"
                 if image_path:
-                    texture_tag = "proposed_color_texture"
                     try:
                         width, height, channels, buffer = dpg.load_image(image_path)
                         dpg.add_raw_texture(
@@ -200,11 +208,11 @@ class TerrainColorMapperGUI:
                             parent=self.texture_registry_tag,
                             format=dpg.mvFormat_Float_rgba
                         )
-                        dpg.add_image(texture_tag, tag="displayed_image", parent="image_window")
+                        dpg.add_image(texture_tag, tag=display_tag, parent=slot_tag)
                     except Exception as e:
-                        dpg.add_text(f"Failed to load image: {e}", color=(255, 100, 100), tag="displayed_image", parent="image_window")
+                        dpg.add_text(f"Failed to load image: {e}", color=(255, 100, 100), tag=display_tag, parent=slot_tag)
                 else:
-                    dpg.add_text("No image loaded", color=(150, 150, 150), tag="displayed_image", parent="image_window")
+                    dpg.add_text("No image loaded", color=(150, 150, 150), tag=display_tag, parent=slot_tag)
         else:
             print(f"Error: Invalid file type. Only .png files are accepted.")
 
