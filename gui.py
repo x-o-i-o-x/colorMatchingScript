@@ -7,6 +7,7 @@ Dear PyGui-based GUI for the Terrain Color Mapper application.
 import dearpygui.dearpygui as dpg
 import sys
 import io
+from terrain_color_mapper import TerrainColorMapper, FILAMENTS, LOOKUP
 
 
 class TerrainColorMapperGUI:
@@ -31,6 +32,8 @@ class TerrainColorMapperGUI:
         self.height_map_image = None
         self.used_color_image = None
         self.top_layer_image = None
+        self.used_color_image_data = None  # Store PIL Image object
+        self.top_layer_image_data = None  # Store PIL Image object
         self.download_buttons = {}  # Store download button references
         self.texture_tags = {}  # Store texture tags for each image
         self.texture_registry_tag = "texture_registry"
@@ -62,6 +65,7 @@ class TerrainColorMapperGUI:
                             attr_name = config["attr_name"]
                             label = config["label"]
                             image_path = getattr(self, attr_name)
+                            image_data = getattr(self, f"{attr_name}_data", None)
                             slot_tag = f"{attr_name}_slot"
                             with dpg.child_window(tag=slot_tag, border=True, autosize_x=False, autosize_y=False, width=300, height=300):
                                 if image_path:
@@ -69,7 +73,16 @@ class TerrainColorMapperGUI:
                                     if dpg.does_item_exist(texture_tag):
                                         dpg.delete_item(texture_tag)
                                     try:
-                                        width, height, channels, buffer = dpg.load_image(image_path)
+                                        # Check if we have image data (PIL Image) or a file path
+                                        if image_data is not None:
+                                            # Convert PIL Image to numpy array for DearPyGUI
+                                            import numpy as np
+                                            img_array = np.array(image_data.convert("RGBA"), dtype=np.float32) / 255.0
+                                            width, height = image_data.size
+                                            buffer = img_array.tobytes()
+                                        else:
+                                            # Load from file path
+                                            width, height, channels, buffer = dpg.load_image(image_path)
                                         dpg.add_raw_texture(
                                             width, height, buffer,
                                             tag=texture_tag,
@@ -146,6 +159,16 @@ class TerrainColorMapperGUI:
         
         # Initialize buttons as disabled
         self._update_download_buttons()
+        
+        dpg.add_spacing(count=3)
+        dpg.add_text("Processing")
+        dpg.add_separator()
+        
+        dpg.add_button(
+            label="Process Images",
+            width=-1,
+            callback=self._on_process_images
+        )
 
     def _create_upload_button(self, image_type, attr_name, status_attr_name):
         """Create an upload button for an image type.
@@ -233,12 +256,47 @@ class TerrainColorMapperGUI:
         """Generic file download handler."""
         attr_name = user_data["attr_name"]
         image_type = user_data["image_type"]
-        file_path = getattr(self, attr_name)
+        image_data = getattr(self, f"{attr_name}_data", None)
         
-        if file_path:
-            print(f"Downloading {image_type} image: {file_path}")
+        if image_data is not None:
+            # Save the PIL Image to disk
+            try:
+                from terrain_color_mapper import OUTPUT_USED_COLOR, OUTPUT_TOP_LAYER
+                if attr_name == "used_color_image":
+                    output_path = OUTPUT_USED_COLOR
+                elif attr_name == "top_layer_image":
+                    output_path = OUTPUT_TOP_LAYER
+                else:
+                    output_path = f"{attr_name}.png"
+                image_data.save(output_path)
+                print(f"Downloaded {image_type} image to: {output_path}")
+            except Exception as e:
+                print(f"Error saving {image_type} image: {e}")
         else:
             print(f"Error: No {image_type} image available.")
+
+    def _on_process_images(self, sender, app_data, user_data):
+        """Process the proposed color image to generate used color and top layer images."""
+        if self.proposed_color_image:
+            try:
+                mapper = TerrainColorMapper(FILAMENTS, LOOKUP)
+                mapper.process_image(self.proposed_color_image)
+                # Store image data (PIL Image objects) directly without saving
+                self.used_color_image_data = mapper.get_used_color_image()
+                self.top_layer_image_data = mapper.get_top_layer_image()
+                # Mark these as available for download (use a sentinel value)
+                self.used_color_image = "<generated>"
+                self.top_layer_image = "<generated>"
+                self._update_download_buttons()
+                # Refresh image display
+                if dpg.does_item_exist("image_grid"):
+                    dpg.delete_item("image_grid")
+                self._create_image_grid(parent="image_window")
+                print("Image processing completed successfully.")
+            except Exception as e:
+                print(f"Error during image processing: {e}")
+        else:
+            print("Error: No proposed color image selected.")
 
     def _display_image(self, attr_name):
         # Disabled while simplifying image display. No dynamic per-slot rendering is used.

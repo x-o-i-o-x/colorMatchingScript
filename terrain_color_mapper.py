@@ -96,9 +96,9 @@ LOOKUP = [
 # ---------------------------------------------------------------------------
 
 INPUT_PNG        = "color.png"      # path to your Gaea color texture
-OUTPUT_NPZ       = "matrices.npz"   # saved output (numpy arrays)
-OUTPUT_PREVIEW   = "preview_result.png"   # matched print color per pixel
-OUTPUT_DEBUG     = "preview_filaments.png"  # top filament identity per pixel
+OUTPUT_NPZ           = "matrices.npz"   # saved output (numpy arrays)
+OUTPUT_USED_COLOR   = "used_color_image.png"   # matched print color per pixel
+OUTPUT_TOP_LAYER    = "top_layer_image.png"  # top filament identity per pixel
 NOT_USED         = 6               # sentinel value for "not required"
 
 # Colors used in the debug PNG to represent each filament slot.
@@ -251,7 +251,7 @@ class TerrainColorMapper:
         np.savez_compressed(output_path, **payload)
         print(f"Saved to {output_path}")
 
-    def save_preview_result(self, output_path):
+    def save_used_color_image(self, output_path):
         """
         PNG 1 — result color preview.
         Each pixel shows the result_rgb of the best-matched lookup entry,
@@ -259,9 +259,9 @@ class TerrainColorMapper:
         """
         img = Image.fromarray(self.meta["rgb_out"], mode="RGB")
         img.save(output_path)
-        print(f"Result preview saved to {output_path}")
+        print(f"Used color image saved to {output_path}")
 
-    def save_preview_debug(self, output_path):
+    def save_top_layer_image(self, output_path):
         """
         PNG 2 — top filament identity map.
         Each pixel is colored by which filament slot sits on top,
@@ -276,7 +276,20 @@ class TerrainColorMapper:
 
         img = Image.fromarray(canvas, mode="RGB")
         img.save(output_path)
-        print(f"Debug preview saved to  {output_path}")
+        print(f"Top layer image saved to {output_path}")
+
+    def get_used_color_image(self):
+        """Return the used color image as a PIL Image object."""
+        return Image.fromarray(self.meta["rgb_out"], mode="RGB")
+
+    def get_top_layer_image(self):
+        """Return the top layer image as a PIL Image object."""
+        H, W = self.meta["tops"].shape
+        canvas = np.zeros((H, W, 3), dtype=np.uint8)
+        for fid in self.filaments:
+            mask = self.meta["tops"] == fid
+            canvas[mask] = DEBUG_COLORS[fid]
+        return Image.fromarray(canvas, mode="RGB")
 
     def print_report(self):
         """Print a human-readable summary of the output matrices."""

@@ -10,8 +10,8 @@ from terrain_color_mapper import (
     LOOKUP,
     INPUT_PNG,
     OUTPUT_NPZ,
-    OUTPUT_PREVIEW,
-    OUTPUT_DEBUG,
+    OUTPUT_USED_COLOR,
+    OUTPUT_TOP_LAYER,
 )
 
 from gui import TerrainColorMapperGUI
