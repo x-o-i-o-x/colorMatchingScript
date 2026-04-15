@@ -161,7 +161,7 @@ class TerrainColorMapper:
 
         return entries
 
-    def _adjust_hsv(self, data: np.ndarray, hue_shift: float = 0.0,
+    def adjust_hsv(self, data: np.ndarray, hue_shift: float = 0.0,
                     saturation_scale: float = 1.0,
                     brightness_scale: float = 1.0) -> np.ndarray:
         """
@@ -197,12 +197,14 @@ class TerrainColorMapper:
         if brightness_scale != 1.0:
             img_hsv[..., 2] = np.clip(img_hsv[..., 2] * brightness_scale, 0.0, 1.0)
 
+        print(f"HSV adjustment applied — hue_shift={hue_shift}°, "
+                  f"saturation_scale={saturation_scale}, "
+                  f"brightness_scale={brightness_scale}")
+
         adjusted = skcolor.hsv2rgb(img_hsv)                # (H, W, 3), float [0, 1]
         return (adjusted * 255.0).round().astype(np.uint8)
 
-    def process_image(self, input_path, hue_shift: float = 0.0,
-                      saturation_scale: float = 1.0,
-                      brightness_scale: float = 1.0):
+    def process_image(self, input_path=None, data=None):
         """
         Main pipeline.
 
@@ -215,15 +217,14 @@ class TerrainColorMapper:
 
         Sets self.matrices and self.meta.
         """
-        img  = Image.open(input_path).convert("RGB")
-        data = np.array(img, dtype=np.uint8)          # shape (H, W, 3)
 
-        # Apply HSV correction when any parameter differs from its neutral value
-        if hue_shift != 0.0 or saturation_scale != 1.0 or brightness_scale != 1.0:
-            data = self._adjust_hsv(data, hue_shift, saturation_scale, brightness_scale)
-            print(f"HSV adjustment applied — hue_shift={hue_shift}°, "
-                  f"saturation_scale={saturation_scale}, "
-                  f"brightness_scale={brightness_scale}")
+        if data == None and input_path != None:
+            img  = Image.open(input_path).convert("RGB")
+            data = np.array(img, dtype=np.uint8)          # shape (H, W, 3)
+
+        if data == None:
+            return
+            
         H, W = data.shape[:2]
 
         print(f"Image size: {W} x {H} ({W*H:,} pixels)")
