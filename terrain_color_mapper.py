@@ -218,11 +218,11 @@ class TerrainColorMapper:
         Sets self.matrices and self.meta.
         """
 
-        if data == None and input_path != None:
+        if data is None and input_path is not None:
             img  = Image.open(input_path).convert("RGB")
             data = np.array(img, dtype=np.uint8)          # shape (H, W, 3)
 
-        if data == None:
+        if data is None:
             return
             
         H, W = data.shape[:2]

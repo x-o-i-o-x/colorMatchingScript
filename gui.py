@@ -7,6 +7,8 @@ Dear PyGui-based GUI for the Terrain Color Mapper application.
 import dearpygui.dearpygui as dpg
 import sys
 import io
+import numpy as np
+from PIL import Image
 from terrain_color_mapper import TerrainColorMapper, FILAMENTS, LOOKUP
 
 
@@ -28,12 +30,18 @@ class TerrainColorMapperGUI:
         self.height_consolePanel = 500
         self.console_header_height = 35  # DPG default title-bar height
         self._console_collapsed = False
+
+        # Store Image file path
         self.proposed_color_image = None
         self.height_map_image = None
         self.used_color_image = None
         self.top_layer_image = None
-        self.used_color_image_data = None  # Store PIL Image object
-        self.top_layer_image_data = None  # Store PIL Image object
+        # Store PIL Image object
+        self.proposed_color_image_data = None
+        self.height_map_image_data = None
+        self.used_color_image_data = None  
+        self.top_layer_image_data = None
+
         self.download_buttons = {}  # Store download button references
         self.texture_tags = {}  # Store texture tags for each image
         self.texture_registry_tag = "texture_registry"
@@ -193,7 +201,7 @@ class TerrainColorMapperGUI:
         with dpg.file_dialog(
             directory_selector=False,
             show=True,
-            callback=self._file_dialog_callback,
+            callback=self._file_dialog_load_callback,
             user_data=user_data,
             width=700,
             height=400
@@ -201,7 +209,7 @@ class TerrainColorMapperGUI:
             dpg.add_file_extension(".png", custom_text="PNG Images")
             dpg.add_file_extension(".*")
 
-    def _file_dialog_callback(self, sender, app_data, user_data):
+    def _file_dialog_load_callback(self, sender, app_data, user_data):
         """Generic file dialog callback."""
         selected_file = app_data["file_path_name"]
         attr_name = user_data["attr_name"]
@@ -210,6 +218,10 @@ class TerrainColorMapperGUI:
         if selected_file.lower().endswith('.png'):
             # Store file path in instance attribute
             setattr(self, attr_name, selected_file)
+
+            # Load and store image data
+            img  = Image.open(selected_file).convert("RGB")
+            setattr(self, f"{attr_name}_data", img)
             
             # Update status widget
             filename = selected_file.split("\\")[-1]
@@ -289,10 +301,14 @@ class TerrainColorMapperGUI:
 
     def _on_process_images(self, sender, app_data, user_data):
         """Process the proposed color image to generate used color and top layer images."""
-        if self.proposed_color_image:
+        if self.proposed_color_image or self.proposed_color_image_data:
             try:
                 mapper = TerrainColorMapper(FILAMENTS, LOOKUP)
-                mapper.process_image(self.proposed_color_image)
+                if self.proposed_color_image_data:
+                    data = np.array(self.proposed_color_image_data, dtype=np.uint8)
+                    mapper.process_image(data=data)
+                else:
+                    mapper.process_image(input_path=self.proposed_color_image)
                 mapper.print_report()
                 # Store image data (PIL Image objects) directly without saving
                 self.used_color_image_data = mapper.get_used_color_image()
