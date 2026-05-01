@@ -122,6 +122,7 @@ class TerrainColorMapper:
         self.lookup_lab = self._build_lookup_lab(self.lookup, self.filaments)
         self.matrices = None
         self.meta = None
+        self.hsv_adjusted = None
 
     def _rgb_to_lab(self, rgb_tuple):
         """Convert a single (R,G,B) 0-255 tuple to CIELAB."""
@@ -197,12 +198,12 @@ class TerrainColorMapper:
         if brightness_scale != 1.0:
             img_hsv[..., 2] = np.clip(img_hsv[..., 2] * brightness_scale, 0.0, 1.0)
 
-        print(f"HSV adjustment applied — hue_shift={hue_shift}°, "
+        print(f"HSV adjustment applied: hue_shift={hue_shift}°, "
                   f"saturation_scale={saturation_scale}, "
                   f"brightness_scale={brightness_scale}")
 
         adjusted = skcolor.hsv2rgb(img_hsv)                # (H, W, 3), float [0, 1]
-        return (adjusted * 255.0).round().astype(np.uint8)
+        self.hsv_adjusted = (adjusted * 255.0).round().astype(np.uint8)
 
     def process_image(self, input_path=None, data=None):
         """
@@ -345,6 +346,10 @@ class TerrainColorMapper:
             mask = self.meta["tops"] == fid
             canvas[mask] = DEBUG_COLORS[fid]
         return Image.fromarray(canvas, mode="RGB")
+    
+    def get_adjusted_hsv_image(self):
+        """Return the adjusted HSV color image as a PIL Image object."""
+        return Image.fromarray(self.hsv_adjusted, mode="RGB")
 
     def print_report(self):
         """Print a human-readable summary of the output matrices."""

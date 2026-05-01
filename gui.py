@@ -17,6 +17,7 @@ class TerrainColorMapperGUI:
     IMAGE_DISPLAY_CONFIG = [
         {"attr_name": "proposed_color_image", "label": "Proposed Color"},
         {"attr_name": "height_map_image", "label": "Height Map"},
+        {"attr_name": "hsv_adjusted_image", "label": "HSV Adjusted Color"},
         {"attr_name": "used_color_image", "label": "Used Color"},
         {"attr_name": "top_layer_image", "label": "Top Layer"},
     ]
@@ -34,17 +35,20 @@ class TerrainColorMapperGUI:
         # Store Image file path
         self.proposed_color_image = None
         self.height_map_image = None
+        self.hsv_adjusted_image = None
         self.used_color_image = None
         self.top_layer_image = None
         # Store PIL Image object
         self.proposed_color_image_data = None
         self.height_map_image_data = None
+        self.hsv_adjusted_image_data = None
         self.used_color_image_data = None  
         self.top_layer_image_data = None
 
         self.download_buttons = {}  # Store download button references
         self.texture_tags = {}  # Store texture tags for each image
         self.texture_registry_tag = "texture_registry"
+        self.hsv_slider = None
 
         # Redirect stdout to capture print statements
         self.console_output = io.StringIO()
@@ -58,18 +62,21 @@ class TerrainColorMapperGUI:
         with dpg.texture_registry(tag=self.texture_registry_tag, show=False):
             pass
 
+        self.mapper = TerrainColorMapper(FILAMENTS, LOOKUP)
+
     # ------------------------------------------------------------------
     # Panel content builders
     # ------------------------------------------------------------------
 
     def _create_image_grid(self, parent=None):
         """Create the image grid that holds all display slots."""
-        with dpg.group(tag="image_grid", horizontal=False, parent=parent):
-            for i in range(0, len(self.IMAGE_DISPLAY_CONFIG), 2):
-                with dpg.group(horizontal=True):
-                    for j in range(2):
-                        if i + j < len(self.IMAGE_DISPLAY_CONFIG):
-                            config = self.IMAGE_DISPLAY_CONFIG[i + j]
+        with dpg.group(tag="image_grid", horizontal=True, parent=parent):
+            for y in range(0, len(self.IMAGE_DISPLAY_CONFIG), 2):
+                with dpg.group(horizontal=False):
+                    for x in range(2):
+                        if x + y < len(self.IMAGE_DISPLAY_CONFIG):
+                            """Create actual image slot."""
+                            config = self.IMAGE_DISPLAY_CONFIG[x + y]
                             attr_name = config["attr_name"]
                             label = config["label"]
                             image_path = getattr(self, attr_name)
@@ -141,7 +148,7 @@ class TerrainColorMapperGUI:
             "proposed_color_status"
         )
         
-        dpg.add_spacing(count=2)
+        dpg.add_spacer(height=2)
         
         self._create_upload_button(
             "Height Map",
@@ -149,16 +156,23 @@ class TerrainColorMapperGUI:
             "height_map_status"
         )
         
-        dpg.add_spacing(count=3)
+        dpg.add_spacer(height=4)
         dpg.add_text("Image Download")
         dpg.add_separator()
+
+        self._create_download_button(
+            "HSV Adjusted",
+            "hsv_adjusted_image"
+        )
+        
+        dpg.add_spacer(height=2)
         
         self._create_download_button(
             "Used Color",
             "used_color_image"
         )
         
-        dpg.add_spacing(count=2)
+        dpg.add_spacer(height=2)
         
         self._create_download_button(
             "Top Layer",
@@ -168,7 +182,7 @@ class TerrainColorMapperGUI:
         # Initialize buttons as disabled
         self._update_download_buttons()
         
-        dpg.add_spacing(count=3)
+        dpg.add_spacer(height=4)
         dpg.add_text("Processing")
         dpg.add_separator()
         
@@ -176,6 +190,21 @@ class TerrainColorMapperGUI:
             label="Process Images",
             width=-1,
             callback=self._on_process_images
+        )
+
+        dpg.add_spacer(height=2)
+
+        self.hsv_slider = dpg.add_3d_slider(
+            label="HSV Adjustment:",
+            min_x=-180,
+            min_y=0,
+            min_z=0,
+            max_x=180,
+            max_y=2,
+            max_z=2,
+            default_value=(1, 1, 1, 0),
+            scale=1,
+            callback=self._on_hsv_changed
         )
 
     def _create_upload_button(self, image_type, attr_name, status_attr_name):
@@ -227,7 +256,7 @@ class TerrainColorMapperGUI:
             filename = selected_file.split("\\")[-1]
             status_attr_name = f"{attr_name.replace('_image', '')}_status"
             status_widget = getattr(self, status_attr_name)
-            dpg.set_value(status_widget, f"✓ {filename}")
+            dpg.set_value(status_widget, f"@ {filename}")
             dpg.configure_item(status_widget, color=(100, 200, 100))
             
             print(f"{image_type} image loaded: {selected_file}")
@@ -301,35 +330,44 @@ class TerrainColorMapperGUI:
 
     def _on_process_images(self, sender, app_data, user_data):
         """Process the proposed color image to generate used color and top layer images."""
-        if self.proposed_color_image or self.proposed_color_image_data:
-            try:
-                mapper = TerrainColorMapper(FILAMENTS, LOOKUP)
-                if self.proposed_color_image_data:
-                    data = np.array(self.proposed_color_image_data, dtype=np.uint8)
-                    mapper.process_image(data=data)
-                else:
-                    mapper.process_image(input_path=self.proposed_color_image)
-                mapper.print_report()
-                # Store image data (PIL Image objects) directly without saving
-                self.used_color_image_data = mapper.get_used_color_image()
-                self.top_layer_image_data = mapper.get_top_layer_image()
-                # Mark these as available for download (use a sentinel value)
-                self.used_color_image = "<generated>"
-                self.top_layer_image = "<generated>"
-                self._update_download_buttons()
-                # Refresh image display
-                if dpg.does_item_exist("image_grid"):
-                    dpg.delete_item("image_grid")
-                self._create_image_grid(parent="image_window")
-                print("Image processing completed successfully.")
-            except Exception as e:
-                print(f"Error during image processing: {e}")
+        if self.hsv_adjusted_image or self.hsv_adjusted_image_data:
+            if self.hsv_adjusted_image_data:
+                data = np.array(self.hsv_adjusted_image_data, dtype=np.uint8)
+                self.mapper.process_image(data=data)
+            else:
+                self.mapper.process_image(input_path=self.hsv_adjusted_image)
+            self.mapper.print_report()
+            # Store image data (PIL Image objects) directly without saving
+            self.used_color_image_data = self.mapper.get_used_color_image()
+            self.top_layer_image_data = self.mapper.get_top_layer_image()
+            # Mark these as available for download (use a sentinel value)
+            self.used_color_image = "<generated>"
+            self.top_layer_image = "<generated>"
+            self._update_download_buttons()
+            # Refresh image display
+            if dpg.does_item_exist("image_grid"):
+                dpg.delete_item("image_grid")
+            self._create_image_grid(parent="image_window")
+            print("Image processing completed successfully.")
         else:
             print("Error: No proposed color image selected.")
 
-    def _display_image(self, attr_name):
-        # Disabled while simplifying image display. No dynamic per-slot rendering is used.
-        return
+    def _on_hsv_changed(self, app_data):
+        hsv_value = dpg.get_value(self.hsv_slider)
+        print("Adjusting HSV values: ", hsv_value)
+        if self.proposed_color_image_data:
+            data = np.array(self.proposed_color_image_data, dtype=np.uint8)
+            self.mapper.adjust_hsv(data, hsv_value[0], hsv_value[1], hsv_value[2])
+            self.hsv_adjusted_image_data = self.mapper.get_adjusted_hsv_image()
+            # Mark these as available for download (use a sentinel value)
+            self.hsv_adjusted_image = "<generated>"
+            self._update_download_buttons()
+            # Refresh image display
+            if dpg.does_item_exist("image_grid"):
+                dpg.delete_item("image_grid")
+            self._create_image_grid(parent="image_window")
+        else:
+            print("Error: Proposed Color Image not loaded.")
 
     # ------------------------------------------------------------------
     # Layout
