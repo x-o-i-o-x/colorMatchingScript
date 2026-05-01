@@ -3,32 +3,67 @@ from stl import mesh
 
 class modelGenerator:
     def __init__(self):
-        self.model = [4]
+        self.baseVertices = None
+        self.baseFaces = None
+        self.finalVertices = [4]
 
-    def safe_mesh(self):
-        vertices = np.array([
-            [0, 0, 0],  # 0
-            [1, 0, 0],  # 1
-            [1, 1, 0],  # 2
-            [0, 1, 0],  # 3
-            [0, 0, 1],  # 4
-            [1, 0, 1],  # 5
-            [1, 1, 1],  # 6
-            [0, 1, 1],  # 7
-        ])
-        faces = np.array([
-            [0, 3, 1], [1, 3, 2],  # bottom
-            [0, 1, 4], [1, 5, 4],  # front
-            [1, 2, 5], [2, 6, 5],  # right
-            [2, 3, 6], [3, 7, 6],  # back
-            [3, 0, 7], [0, 4, 7],  # left
-            [4, 5, 6], [4, 6, 7],  # top
-        ])
-        self.model[0] = mesh.Mesh(np.zeros(len(faces), dtype=mesh.Mesh.dtype))
-        for i, face in enumerate(faces):
-            self.model[0].vectors[i] = vertices[face]
-        self.model[0].save("model.stl")
+    def _generateBase(self, xSize, ySize):
+        # Create Vertices
+        xs = np.tile(np.arange(xSize), ySize * 2)
+        ys = np.repeat(np.arange(ySize), xSize)
+        ys = np.tile(ys, 2)
+        zs = np.repeat([0, 1], xSize * ySize)
+        self.baseVertices = np.stack([xs, ys, zs], axis=1)
+
+        # Create Faces
+        L = xSize * ySize  # layer size
+
+        # --- Top / Bottom ---
+        x = np.tile(np.arange(xSize - 1), ySize - 1)
+        y = np.repeat(np.arange(ySize - 1), xSize - 1)
+
+        tl = y * xSize + x;        tr = y * xSize + x + 1
+        bl = (y+1) * xSize + x;    br = (y+1) * xSize + x + 1
+
+        top    = np.stack([L + tl, L + tr, L + br,
+                        L + tl, L + br, L + bl], axis=1).reshape(-1, 3)
+        bottom = np.stack([tl, br, tr,
+                        tl, bl, br], axis=1).reshape(-1, 3)
+
+        # --- Front / Back ---
+        x = np.arange(xSize - 1)
+
+        fl = x;              fr = x + 1
+        front = np.stack([fl, fr, L + fr,
+                        fl, L + fr, L + fl], axis=1).reshape(-1, 3)
+
+        bl_ = (ySize-1) * xSize + x;  br_ = (ySize-1) * xSize + x + 1
+        back  = np.stack([bl_, L + bl_, L + br_,
+                        bl_, L + br_, br_], axis=1).reshape(-1, 3)
+
+        # --- Left / Right ---
+        y = np.arange(ySize - 1)
+
+        lt = y * xSize;            lb = (y+1) * xSize
+        left  = np.stack([lt, L + lt, L + lb,
+                        lt, L + lb, lb], axis=1).reshape(-1, 3)
+
+        rt = y * xSize + (xSize-1);   rb = (y+1) * xSize + (xSize-1)
+        right = np.stack([rt, rb, L + rb,
+                        rt, L + rb, L + rt], axis=1).reshape(-1, 3)
+        
+        self.baseFaces = np.concatenate([top, bottom, front, back, left, right])
+
+    def get_mesh(self, filament):
+        # Create Mesh
+        model = mesh.Mesh(np.zeros(len(self.baseFaces), dtype=mesh.Mesh.dtype))
+        for i, face in enumerate(self.baseFaces):
+            model.vectors[i] = self.finalVertices[filament][face]
+        
+        return model
 
 if __name__ == "__main__":
     mg = modelGenerator()
-    mg.safe_mesh()
+    mg._generateBase(32, 32)
+    mg.finalVertices[0] = mg.baseVertices
+    mg.get_mesh(0).save("model.stl")
