@@ -1,5 +1,6 @@
 import numpy as np
 from stl import mesh
+from PIL import Image
 
 class modelGenerator:
     def __init__(self):
@@ -54,6 +55,13 @@ class modelGenerator:
         
         self.baseFaces = np.concatenate([top, bottom, front, back, left, right])
 
+    def loadHeightMap(self, heightMap):
+        xSize = len(heightMap)
+        ySize = len(heightMap[0])
+
+        self._generateBase(xSize, ySize)
+        self.baseVertices[xSize*ySize:, 2] = heightMap[:, :, 0].T.ravel()
+
     def get_mesh(self, filament):
         # Create Mesh
         model = mesh.Mesh(np.zeros(len(self.baseFaces), dtype=mesh.Mesh.dtype))
@@ -64,6 +72,9 @@ class modelGenerator:
 
 if __name__ == "__main__":
     mg = modelGenerator()
-    mg._generateBase(32, 32)
+    # mg._generateBase(32, 32)
+    img  = Image.open("Height.png").convert("RGB")
+    data = np.array(img, dtype=np.uint8)
+    mg.loadHeightMap(data)
     mg.finalVertices[0] = mg.baseVertices
     mg.get_mesh(0).save("model.stl")
