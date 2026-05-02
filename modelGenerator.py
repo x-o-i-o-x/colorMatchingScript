@@ -6,7 +6,12 @@ class modelGenerator:
     def __init__(self):
         self.baseVertices = None
         self.baseFaces = None
-        self.finalVertices = [4]
+        self.finalVertices = [[]] * 4
+        self.imgWidth = None
+        self.imgLength = None
+        self.imgSize = None
+        self.meshWidth = None
+        self.meshLenght = None
 
     def _generateBase(self, xSize, ySize):
         # Create Vertices
@@ -56,25 +61,42 @@ class modelGenerator:
         self.baseFaces = np.concatenate([top, bottom, front, back, left, right])
 
     def loadHeightMap(self, heightMap):
-        xSize = len(heightMap)
-        ySize = len(heightMap[0])
+        self.imgWidth = len(heightMap)
+        self.imgLength = len(heightMap[0])
 
-        self._generateBase(xSize, ySize)
-        self.baseVertices[xSize*ySize:, 2] = heightMap[:, :, 0].T.ravel()
+        self.imgSize = self.imgWidth * self.imgLength
+
+        self._generateBase(self.imgWidth, self.imgLength)
+        self.baseVertices[self.imgSize:, 2] = heightMap[:, :, 0].T.ravel()
+
+    def generateMeshes(self, layerHeight, width, length, heightOffset, heightScale):
+        self.meshWidth = width
+        self.meshLenght = length
+
+        # Set up master layer
+        self.finalVertices[0] = self.baseVertices
+        self.finalVertices[0][self.imgSize:, :2] = self.baseVertices[self.imgSize:, :2]
+        self.finalVertices[0][self.imgSize:, 2] = self.baseVertices[self.imgSize:, 2] * heightScale + heightOffset
+
+        # Set up other layers
+        for i in range(1, 4):
+            self.finalVertices[i] = self.finalVertices[0]
 
     def get_mesh(self, filament):
         # Create Mesh
         model = mesh.Mesh(np.zeros(len(self.baseFaces), dtype=mesh.Mesh.dtype))
         for i, face in enumerate(self.baseFaces):
             model.vectors[i] = self.finalVertices[filament][face]
+
+        model.x *= (self.meshWidth / self.imgWidth)
+        model.y *= (self.meshLenght / self.imgLength)
         
         return model
 
 if __name__ == "__main__":
     mg = modelGenerator()
-    # mg._generateBase(32, 32)
-    img  = Image.open("Height.png").convert("RGB")
+    img  = Image.open("Height8.png").convert("RGB")
     data = np.array(img, dtype=np.uint8)
     mg.loadHeightMap(data)
-    mg.finalVertices[0] = mg.baseVertices
+    mg.generateMeshes(0.2, 1, 1, 0, 0.01)
     mg.get_mesh(0).save("model.stl")
