@@ -19,7 +19,7 @@ class modelGenerator:
         ys = np.repeat(np.arange(ySize), xSize)
         ys = np.tile(ys, 2)
         zs = np.repeat([0, 1], xSize * ySize)
-        self.baseVertices = np.stack([xs, ys, zs], axis=1)
+        self.baseVertices = np.stack([xs, ys, zs], axis=1, dtype=np.float64)
 
         # Create Faces
         L = xSize * ySize  # layer size
@@ -67,7 +67,7 @@ class modelGenerator:
         self.imgSize = self.imgWidth * self.imgLength
 
         self._generateBase(self.imgWidth, self.imgLength)
-        self.baseVertices[self.imgSize:, 2] = heightMap[:, :, 0].T.ravel()
+        self.baseVertices[self.imgSize:, 2] = heightMap.T.ravel()
 
     def generateMeshes(self, layerHeight, width, length, heightOffset, heightScale):
         self.meshWidth = width
@@ -95,8 +95,10 @@ class modelGenerator:
 
 if __name__ == "__main__":
     mg = modelGenerator()
-    img  = Image.open("Height8.png").convert("RGB")
-    data = np.array(img, dtype=np.uint8)
+    img  = Image.open("Height16.png")
+    data = np.array(img, dtype=np.uint16)
+    # data = np.array([[[0, 0, 0], [1, 1, 1], [100, 100, 100]], [[223, 223, 223], [224, 224, 224], [225, 225, 225]]], dtype=np.uint8)
+    # data = np.array([[0, 1, 100], [223, 224, 225]], dtype=np.uint16)
     mg.loadHeightMap(data)
-    mg.generateMeshes(0.2, 1, 1, 0, 0.01)
+    mg.generateMeshes(0.2, 1, 1, 1, 0.01)
     mg.get_mesh(0).save("model.stl")
