@@ -212,9 +212,7 @@ class TerrainColorMapper:
         Parameters
         ----------
         input_path        : str — path to the input colour PNG.
-        hue_shift         : float — degrees to rotate hue before matching (default 0).
-        saturation_scale  : float — saturation multiplier before matching (default 1).
-        brightness_scale  : float — brightness multiplier before matching (default 1).
+        data              : img — image data
 
         Sets self.matrices and self.meta.
         """
@@ -333,6 +331,10 @@ class TerrainColorMapper:
         img = Image.fromarray(canvas, mode="RGB")
         img.save(output_path)
         print(f"Top layer image saved to {output_path}")
+    
+    def get_matrices(self):
+        """Return the matrices."""
+        return self.matrices
 
     def get_used_color_image(self):
         """Return the used color image as a PIL Image object."""

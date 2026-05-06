@@ -2,7 +2,7 @@ import numpy as np
 from stl import mesh
 from PIL import Image
 
-class modelGenerator:
+class ModelGenerator:
     def __init__(self):
         self.baseVertices = None
         self.baseFaces = None
@@ -67,9 +67,9 @@ class modelGenerator:
         self.imgSize = self.imgWidth * self.imgLength
 
         self._generateBase(self.imgWidth, self.imgLength)
-        self.baseVertices[self.imgSize:, 2] = heightMap.T.ravel()
+        self.baseVertices[self.imgSize:, 2] = heightMap.T.ravel() / 65536   # 2^16 because png16
 
-    def generateMeshes(self, layerHeight, width, length, heightOffset, heightScale):
+    def generateMeshes(self, matrices, layerHeight, width, length, heightOffset, heightScale):
         self.meshWidth = width
         self.meshLenght = length
 
@@ -79,8 +79,17 @@ class modelGenerator:
         self.finalVertices[0][self.imgSize:, 2] = self.baseVertices[self.imgSize:, 2] * heightScale + heightOffset
 
         # Set up other layers
-        for i in range(1, 4):
-            self.finalVertices[i] = self.finalVertices[0]
+        for filament in range(1, 4):
+            # Set x and y axis
+            self.finalVertices[filament] = self.finalVertices[0]
+            # Set z axis
+            for pixel in range(self.imgSize):
+                if matrices[filament][pixel % self.imgWidth, pixel // self.imgWidth] < 6:
+                    self.finalVertices[filament][self.imgSize + pixel, 2] = self.finalVertices[0][self.imgSize + pixel, 2] - (layerHeight * matrices[filament][pixel % self.imgWidth, pixel // self.imgWidth])
+                else:
+                    # Filament not used
+                    self.finalVertices[filament][self.imgSize + pixel, 2] = 0
+        print("Mesh generation complete")
 
     def get_mesh(self, filament):
         # Create Mesh
@@ -94,11 +103,11 @@ class modelGenerator:
         return model
 
 if __name__ == "__main__":
-    mg = modelGenerator()
+    mg = ModelGenerator()
     img  = Image.open("Height16.png")
     data = np.array(img, dtype=np.uint16)
     # data = np.array([[[0, 0, 0], [1, 1, 1], [100, 100, 100]], [[223, 223, 223], [224, 224, 224], [225, 225, 225]]], dtype=np.uint8)
     # data = np.array([[0, 1, 100], [223, 224, 225]], dtype=np.uint16)
     mg.loadHeightMap(data)
-    mg.generateMeshes(0.2, 1, 1, 1, 0.01)
+    mg.generateMeshes(0.2, 1, 1, 1, 0.5)
     mg.get_mesh(0).save("model.stl")

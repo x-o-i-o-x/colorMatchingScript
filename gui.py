@@ -10,6 +10,7 @@ import io
 import numpy as np
 from PIL import Image
 from terrain_color_mapper import TerrainColorMapper, FILAMENTS, LOOKUP
+from modelGenerator import ModelGenerator
 
 
 class TerrainColorMapperGUI:
@@ -63,6 +64,7 @@ class TerrainColorMapperGUI:
             pass
 
         self.mapper = TerrainColorMapper(FILAMENTS, LOOKUP)
+        self.generator = ModelGenerator()
 
     # ------------------------------------------------------------------
     # Panel content builders
@@ -138,7 +140,10 @@ class TerrainColorMapperGUI:
             self.console_text_tag = dpg.add_text("", tag="console_text")
 
     def _setup_control_panel(self):
-        """Set up the control panel with image upload and download buttons."""
+        """Set up the control panel."""
+
+        # IMAGE MANAGEMENT
+
         dpg.add_text("Image Upload")
         dpg.add_separator()
         
@@ -180,7 +185,9 @@ class TerrainColorMapperGUI:
         )
         
         # Initialize buttons as disabled
-        self._update_download_buttons()
+        self._update_download_buttons_state()
+
+        # PROCESSING
         
         dpg.add_spacer(height=4)
         dpg.add_text("Processing")
@@ -205,6 +212,12 @@ class TerrainColorMapperGUI:
             default_value=(1, 1, 1, 0),
             scale=1,
             callback=self._on_hsv_changed
+        )
+
+        dpg.add_button(
+            label="Generate Models",
+            width=-1,
+            callback=self._on_generate_models
         )
 
     def _create_upload_button(self, image_type, attr_name, status_attr_name):
@@ -261,8 +274,7 @@ class TerrainColorMapperGUI:
             
             print(f"{image_type} image loaded: {selected_file}")
             
-            # Update download buttons state
-            self._update_download_buttons()
+            self._update_download_buttons_state()
             
             # Refresh image display if the uploaded image is one of the display images
             if attr_name in [config["attr_name"] for config in self.IMAGE_DISPLAY_CONFIG]:
@@ -287,7 +299,7 @@ class TerrainColorMapperGUI:
         )
         self.download_buttons[attr_name] = btn
 
-    def _update_download_buttons(self):
+    def _update_download_buttons_state(self):
         """Enable/disable download buttons based on image availability."""
         for attr_name, btn in self.download_buttons.items():
             # Check if the image data exists (PIL Image object in memory)
@@ -343,7 +355,7 @@ class TerrainColorMapperGUI:
             # Mark these as available for download (use a sentinel value)
             self.used_color_image = "<generated>"
             self.top_layer_image = "<generated>"
-            self._update_download_buttons()
+            self._update_download_buttons_state()
             # Refresh image display
             if dpg.does_item_exist("image_grid"):
                 dpg.delete_item("image_grid")
@@ -361,13 +373,23 @@ class TerrainColorMapperGUI:
             self.hsv_adjusted_image_data = self.mapper.get_adjusted_hsv_image()
             # Mark these as available for download (use a sentinel value)
             self.hsv_adjusted_image = "<generated>"
-            self._update_download_buttons()
+            self._update_download_buttons_state()
             # Refresh image display
             if dpg.does_item_exist("image_grid"):
                 dpg.delete_item("image_grid")
             self._create_image_grid(parent="image_window")
         else:
             print("Error: Proposed Color Image not loaded.")
+
+    def _on_generate_models(self, sender, app_data, user_data):
+        if self.height_map_image_data is not None:
+            img = np.array(Image.open(self.height_map_image), dtype=np.uint16)
+            self.generator.loadHeightMap(img)
+            self.generator.generateMeshes(self.mapper.get_matrices(), 0.1, 1, 1, 1, 0.5)
+            self.generator.get_mesh(0).save("model.stl")
+            self.generator.get_mesh(1).save("model1.stl")
+            self.generator.get_mesh(2).save("model2.stl")
+            self.generator.get_mesh(3).save("model3.stl")
 
     # ------------------------------------------------------------------
     # Layout
