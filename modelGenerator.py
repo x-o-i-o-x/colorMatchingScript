@@ -85,9 +85,11 @@ class ModelGenerator:
             for pixel in range(self.imgSize):
                 if matrices[filament][pixel % self.imgWidth, pixel // self.imgWidth] < 6:
                     self.finalVertices[filament][self.imgSize + pixel, 2] = self.finalVertices[0][self.imgSize + pixel, 2] - (layerHeight * matrices[filament][pixel % self.imgWidth, pixel // self.imgWidth])
+                    neighbourValues = np.delete(np.stack(list(matrices.values()))[:, pixel % self.imgWidth, pixel // self.imgWidth], filament)
+                    self.finalVertices[filament][pixel, 2] = neighbourValues.min()
                 else:
                     # Filament not used
-                    self.finalVertices[filament][self.imgSize + pixel, 2] = 0
+                    self.finalVertices[filament][self.imgSize + pixel, 2] = 0.001
         print("Mesh generation complete")
 
     def get_mesh(self, filament):
