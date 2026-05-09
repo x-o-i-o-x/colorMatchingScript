@@ -82,11 +82,11 @@ class ModelGenerator:
             # Set x and y axis
             self.finalVertices[filament] = self.finalVertices[0].copy()
             # Set z axis
+            neighbourValues = np.delete(np.stack(list(matrices.values())), filament, axis=0).min(axis=0).flatten()
             for pixel in range(self.imgSize):
                 if matrices[filament][pixel % self.imgWidth, pixel // self.imgWidth] < 6:
                     self.finalVertices[filament][self.imgSize + pixel, 2] = self.finalVertices[0][self.imgSize + pixel, 2] - (layerHeight * matrices[filament][pixel % self.imgWidth, pixel // self.imgWidth])
-                    neighbourValues = np.delete(np.stack(list(matrices.values()))[:, pixel % self.imgWidth, pixel // self.imgWidth], filament)
-                    self.finalVertices[filament][pixel, 2] = neighbourValues.min()
+                    self.finalVertices[filament][pixel, 2] = self.finalVertices[0][self.imgSize + pixel, 2] - (layerHeight * neighbourValues[pixel])
                 else:
                     # Filament not used
                     self.finalVertices[filament][self.imgSize + pixel, 2] = 0.001
