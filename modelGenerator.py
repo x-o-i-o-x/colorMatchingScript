@@ -75,13 +75,12 @@ class ModelGenerator:
 
         # Set up master layer
         self.finalVertices[0] = self.baseVertices
-        self.finalVertices[0][self.imgSize:, :2] = self.baseVertices[self.imgSize:, :2]
         self.finalVertices[0][self.imgSize:, 2] = self.baseVertices[self.imgSize:, 2] * heightScale + heightOffset
 
         # Set up other layers
         for filament in range(1, 4):
             # Set x and y axis
-            self.finalVertices[filament] = self.finalVertices[0]
+            self.finalVertices[filament] = self.finalVertices[0].copy()
             # Set z axis
             for pixel in range(self.imgSize):
                 if matrices[filament][pixel % self.imgWidth, pixel // self.imgWidth] < 6:
