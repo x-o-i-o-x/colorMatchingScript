@@ -46,10 +46,19 @@ class TerrainColorMapperGUI:
         self.used_color_image_data = None  
         self.top_layer_image_data = None
 
+        # Generated Models
+        self.models = [None] * 4
+
+        # DearPyGUI objects
         self.download_buttons = {}  # Store download button references
         self.texture_tags = {}  # Store texture tags for each image
         self.texture_registry_tag = "texture_registry"
         self.hsv_slider = None
+        self.layerHeight = None
+        self.modelWidth = None
+        self.modelLenght = None
+        self.modelOffset = None
+        self.modelScale = None
 
         # Redirect stdout to capture print statements
         self.console_output = io.StringIO()
@@ -214,10 +223,43 @@ class TerrainColorMapperGUI:
             callback=self._on_hsv_changed
         )
 
+        # GENERATION
+        
+        dpg.add_spacer(height=4)
+        dpg.add_text("Generation")
+        dpg.add_separator()
+
         dpg.add_button(
             label="Generate Models",
             width=-1,
             callback=self._on_generate_models
+        )
+
+        dpg.add_spacer(height=2)
+
+        self.layerHeight = dpg.add_input_float(
+            label="Layer Height",
+            default_value=0.2,
+        )
+
+        self.modelWidth = dpg.add_input_float(
+            label="Width",
+            default_value=100,
+        )
+
+        self.modelLenght = dpg.add_input_float(
+            label="Length",
+            default_value=100,
+        )
+
+        self.modelOffset = dpg.add_input_float(
+            label="Height Offset",
+            default_value=0,
+        )
+
+        self.modelScale = dpg.add_input_float(
+            label="Height Scale",
+            default_value=50,
         )
 
     def _create_upload_button(self, image_type, attr_name, status_attr_name):
@@ -385,11 +427,17 @@ class TerrainColorMapperGUI:
         if self.height_map_image_data is not None:
             img = np.array(Image.open(self.height_map_image), dtype=np.uint16)
             self.generator.loadHeightMap(img)
-            self.generator.generateMeshes(self.mapper.get_matrices(), 0.1, 1, 1, 1, 0.5)
-            self.generator.get_mesh(0).save("model.stl")
-            self.generator.get_mesh(1).save("model1.stl")
-            self.generator.get_mesh(2).save("model2.stl")
-            self.generator.get_mesh(3).save("model3.stl")
+            self.generator.generateMeshes(self.mapper.get_matrices(), dpg.get_value(self.layerHeight), dpg.get_value(self.modelWidth), dpg.get_value(self.modelLenght), dpg.get_value(self.modelOffset), dpg.get_value(self.modelScale))
+            numbers = ["1st", "2nd", "3rd", "4th"]
+            for i in range(4):
+                self.models[i] = self.generator.get_mesh(i)
+                self.models[i].save(f"model{i}.stl")
+                print(numbers[i], "model generated")
+            print("Mesh generation complete")
+            # self.generator.get_mesh(0).save("model.stl")
+            # self.generator.get_mesh(1).save("model1.stl")
+            # self.generator.get_mesh(2).save("model2.stl")
+            # self.generator.get_mesh(3).save("model3.stl")
 
     # ------------------------------------------------------------------
     # Layout

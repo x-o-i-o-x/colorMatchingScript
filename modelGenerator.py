@@ -90,7 +90,7 @@ class ModelGenerator:
                 else:
                     # Filament not used
                     self.finalVertices[filament][self.imgSize + pixel, 2] = 0.001
-        print("Mesh generation complete")
+        print("Vertices generation complete")
 
     def get_mesh(self, filament):
         # Create Mesh
