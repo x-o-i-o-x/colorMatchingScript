@@ -3,6 +3,7 @@
 *.npz
 *.pyc
 *.txt
+*.3mf
 __pycache__/
 .vscode/
 .venv/
