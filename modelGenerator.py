@@ -82,14 +82,15 @@ class ModelGenerator:
             # Set x and y axis
             self.finalVertices[filament] = self.finalVertices[0].copy()
             # Set z axis
-            neighbourValues = np.delete(np.stack(list(matrices.values())), filament, axis=0).min(axis=0).flatten()
+            neighbourValues = np.delete(np.stack(list(matrices.values())), filament, axis=0).min(axis=0)
             for pixel in range(self.imgSize):
                 if matrices[filament][pixel % self.imgWidth, pixel // self.imgWidth] < 6:
                     self.finalVertices[filament][self.imgSize + pixel, 2] = self.finalVertices[0][self.imgSize + pixel, 2] - (layerHeight * matrices[filament][pixel % self.imgWidth, pixel // self.imgWidth])
-                    self.finalVertices[filament][pixel, 2] = self.finalVertices[0][self.imgSize + pixel, 2] - (layerHeight * neighbourValues[pixel])
+                    self.finalVertices[filament][pixel, 2] = self.finalVertices[0][self.imgSize + pixel, 2] - (layerHeight * neighbourValues[pixel % self.imgWidth, pixel // self.imgWidth])
                 else:
                     # Filament not used
-                    self.finalVertices[filament][self.imgSize + pixel, 2] = 0.001
+                    self.finalVertices[filament][self.imgSize + pixel, 2] = self.finalVertices[0][self.imgSize + pixel, 2] - (layerHeight * 6)
+                    self.finalVertices[filament][pixel, 2] = self.finalVertices[0][self.imgSize + pixel, 2] - (layerHeight * 6)
         print("Vertices generation complete")
 
     def get_mesh(self, filament):
